@@ -8,6 +8,7 @@ from pathlib import Path
 
 from . import __version__
 from .fastfile import inspect_fastfile, unpack_fastfile
+from .hermes_adapter import decode_with_hermes
 from .io_utils import json_text, read_bounded, write_new_file
 
 
@@ -26,8 +27,8 @@ def parser() -> argparse.ArgumentParser:
         prog="talos",
         description=(
             "Direct BO1-to-BO3 binary fastfile conversion foundation. "
-            "Implemented: BO1 inspection and unpacking. "
-            "Asset conversion and the native BO3 fastfile writer are not implemented yet."
+            "Implemented: BO1 inspection, unpacking, and lossless Hermes T5 graph decode. "
+            "Semantic conversion and native BO3 fastfile writing are not implemented yet."
         ),
     )
     root.add_argument("--version", action="version", version=f"Talos {__version__}")
@@ -38,15 +39,23 @@ def parser() -> argparse.ArgumentParser:
         sub.add_argument("input", type=Path)
         sub.add_argument("--max-input-mib", type=positive_int, default=512)
         if command == "unpack":
-            sub.add_argument("--output", type=Path, required=True, help="new raw zone file (not a map or target fastfile)")
+            sub.add_argument("--output", type=Path, required=True, help="new diagnostic T5 zone file")
             sub.add_argument("--max-output-mib", type=positive_int, default=256)
 
+    sub = commands.add_parser("decode", help="decode a BO1 fastfile through Hermes into lossless T5 graph IR")
+    sub.add_argument("input", type=Path)
+    sub.add_argument("--hermes", type=Path, required=True, help="Hermes executable with export-talos support")
+    sub.add_argument("--output", type=Path, required=True, help="new Talos T5 binary-source bundle")
     return root
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.command == "decode":
+            report = decode_with_hermes(args.input, args.hermes, args.output)
+            print(json_text(report), end="")
+            return 0
         data = read_bounded(args.input, args.max_input_mib * MIB)
         if args.command == "inspect":
             report = inspect_fastfile(data)

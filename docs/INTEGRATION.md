@@ -1,75 +1,78 @@
-# Integration evidence
+# Binary integration evidence
 
-## Required ownership
+## Binding direction
 
-Talos must convert **BO1 `.ff` directly into BO3 `.ff`**. The user confirmed this
-binary architecture; it supersedes the earlier source-export implementation and
-any conflicting donor plan.
+Talos is a direct BO1-to-BO3 binary fastfile converter. Its stages are T5
+container/asset decode, semantic conversion, native T7 zone serialization, and
+BO3 container output. Radiant, `.map` files, source export, and Mod Tools
+compilation are not part of this path.
 
-| Component | Responsibility |
-| --- | --- |
-| BO1 input adapter | Decode T5 containers, zones, asset records, and dependencies; reuse verified Hermes knowledge. |
-| Talos conversion layer | Preserve source meaning and translate each supported asset into its BO3 counterpart. |
-| Native BO3 serializer | Write T7 asset layouts, zone structures, references, and fixups using verified binary rules; reuse relevant Damocles code when available. |
-| BO3 container writer | Package the serialized target zone into the supported BO3 `.ff` profile. |
-| Validation | Check source/target inventories, target binary structure, loader acceptance, and runtime fidelity separately. |
-
-Hermes's WaW writer and Damocles's BO4 reader are not the halves needed here.
-Talos should preserve BO1 data directly for its BO3 target. It does not use
-Radiant, `.map` interchange, source export, or Mod Tools compilation as a bridge.
-
-## Accessible donor snapshots
-
-The connected repositories were inspected on October 20, 2026
-(America/Los_Angeles).
+## Donor audit
 
 ### Damocles
 
-The accessible revision was
+Audited commit:
 [`ae16724f4b6a93dbc3f1f731bce47fc4736215b2`](https://github.com/Zippingrocks/Damocles/commit/ae16724f4b6a93dbc3f1f731bce47fc4736215b2).
-Its [pipeline](https://github.com/Zippingrocks/Damocles/blob/ae16724f4b6a93dbc3f1f731bce47fc4736215b2/src/pipeline.rs)
-stops at an unmet container-decoding stage, and its
-[IR](https://github.com/Zippingrocks/Damocles/blob/ae16724f4b6a93dbc3f1f731bce47fc4736215b2/src/ir.rs)
-holds asset metadata. That snapshot contains no native T7 writer to integrate.
-Its source-output plan is not authority for Talos. Compare any more advanced
-donor revision before duplicating its existing binary implementation.
+
+Its `src/pipeline.rs` stops at an unmet container-decoding stage and its
+`src/ir.rs` holds T8/T7-oriented asset metadata. That snapshot contains no native
+T7 writer ready to transplant. A newer Damocles revision must be audited before
+duplicating any BO3 binary implementation.
 
 ### Hermes
 
-The working Hermes source was not available in the connected repository
-inventory. [Damocles's findings](https://github.com/Zippingrocks/Damocles/blob/ae16724f4b6a93dbc3f1f731bce47fc4736215b2/docs/FINDINGS.md)
-identify revision `d25cda930903e2c6041736fe0f523c4bd2dcf4f9` and modules
-`src/game.rs`, `src/fastfile.rs`, `src/zone.rs`, and `tools/zonecode.py`.
-These identify the intended decoder for a future adapter; they do not establish
-its current API. No unrelated project sharing the name was substituted.
+Integrated source:
+[`KingslayerKyle/Hermes` commit `19935492d9f3667b2b397a7b2c1d0980bf1d9ea2`](https://github.com/KingslayerKyle/Hermes/commit/19935492d9f3667b2b397a7b2c1d0980bf1d9ea2).
 
-## Verified BO1 container facts
+Hermes supplies the implemented T5 container reader, generated T5 type/load
+layout, complete loader walk, allocation graph, resolved pointer topology, asset
+roots, and script strings. `hermes export-talos` publishes schema
+`hermes_t5_zone_graph` version 1, documented in
+[T5_ZONE_GRAPH.md](T5_ZONE_GRAPH.md).
 
-Talos independently implements a narrow container reader using these primary
-references from OpenAssetTools commit
+Talos validates every file, graph extent, link location, target location, asset
+root, and dependency index before accepting the bundle. No WaW output is used;
+the exact decoded BO1 graph remains available to the future T7 converter.
+
+## Independently verified BO1 container facts
+
+Talos's narrow container reader uses primary format evidence from
+OpenAssetTools commit
 [`06a121f7cf6658ea3989b3478b6275ce8c1c7b6d`](https://github.com/Laupetin/OpenAssetTools/commit/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d):
 
-| Fact used by Talos | Primary source |
+| Fact | Primary source |
 | --- | --- |
 | `IWffu100`, version `473` | [ZoneConstantsT5.h](https://github.com/Laupetin/OpenAssetTools/blob/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d/src/ZoneCommon/Game/T5/ZoneConstantsT5.h) |
-| Eight magic bytes and 32-bit version | [ZoneTypes.h](https://github.com/Laupetin/OpenAssetTools/blob/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d/src/Common/Zone/ZoneTypes.h) |
+| Eight-byte magic and 32-bit version | [ZoneTypes.h](https://github.com/Laupetin/OpenAssetTools/blob/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d/src/Common/Zone/ZoneTypes.h) |
 | Little-endian PC profile, seven blocks, inflate after header | [ZoneLoaderFactoryT5.cpp](https://github.com/Laupetin/OpenAssetTools/blob/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d/src/ZoneLoading/Game/T5/ZoneLoaderFactoryT5.cpp) |
-| Two initial unsigned size fields | [StepLoadZoneSizes.cpp](https://github.com/Laupetin/OpenAssetTools/blob/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d/src/ZoneLoading/Loading/Steps/StepLoadZoneSizes.cpp) |
-| Block-size loading and order | [StepAllocXBlocks.cpp](https://github.com/Laupetin/OpenAssetTools/blob/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d/src/ZoneLoading/Loading/Steps/StepAllocXBlocks.cpp), [T5_Assets.h](https://github.com/Laupetin/OpenAssetTools/blob/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d/src/Common/Game/T5/T5_Assets.h) |
+| Initial size fields | [StepLoadZoneSizes.cpp](https://github.com/Laupetin/OpenAssetTools/blob/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d/src/ZoneLoading/Loading/Steps/StepLoadZoneSizes.cpp) |
+| Block sizes and order | [StepAllocXBlocks.cpp](https://github.com/Laupetin/OpenAssetTools/blob/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d/src/ZoneLoading/Game/T5/ZoneLoaderFactoryT5.cpp), [T5_Assets.h](https://github.com/Laupetin/OpenAssetTools/blob/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d/src/Common/Game/T5/T5_Assets.h) |
 
-No OpenAssetTools implementation is vendored. The current reader records the
-XFile allocation sizes without trusting them as allocations or equating them to
-the input length. Strict single-stream and trailing-byte rejection define
-Talos's supported profile, not a rule asserted for every authentic fastfile.
+No OpenAssetTools implementation is vendored. Declared sizes are reported and
+checked against Hermes's loader accounting; they are never trusted as unchecked
+allocations.
 
-## Correction history and next integration
+## Retail source-decode evidence
 
-Commit [`18e6332`](https://github.com/Zippingrocks/talos/commit/18e633239da42e873d6688089c0c5f517d2c2eeb)
-introduced a source-export detour. That path is superseded and removed from the
-active tree; the historical implementation remains recoverable through Git.
+On October 20, 2026, the integrated command decoded an installed PC
+`zombie_theater.ff` with SHA-256
+`970db88bb5ae9aa1d3875cdbd55d43212f22ee55096ce251f596d4a38a776786`.
+Hermes consumed the complete zone, matched its block reservations, and reported
+zero unlinked back-references. Talos independently validated 908 assets, 68,870
+nodes, 75,315 chunks, 169,490 links, 789 script strings, and 111,197,324 graph
+bytes. Proprietary output is not committed.
 
-The retained implementation ends after container unpacking and XFile header
-inspection. The next binary stages are documented in
-[BINARY_PIPELINE.md](BINARY_PIPELINE.md). Neither a complete Hermes adapter nor a
-native BO3 writer is currently integrated, and no successful fastfile conversion
-is claimed.
+## Remaining binary stages
+
+1. Lift each supported T5 root into versioned semantic IR while retaining opaque
+   source fields and reporting every unsupported member and dependency.
+2. Establish primary evidence for native T7 asset IDs, structures, alignment,
+   pointer/fixup encoding, zone blocks, compression, and container framing.
+3. Translate render worlds, collision, placements, materials/images, entities,
+   lighting/visibility, models/animation, sound, FX, scripts, and gameplay.
+4. Serialize and independently read back a native T7 zone; agreement with the
+   writer's own assumptions is insufficient.
+5. Establish BO3 loader acceptance and then measure map and gameplay fidelity.
+
+The source-export detour introduced in `18e6332` is superseded and removed from
+the active tree. No successful BO1-to-BO3 fastfile conversion is claimed yet.

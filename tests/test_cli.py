@@ -191,7 +191,7 @@ class CommandLineTests(unittest.TestCase):
     def test_module_entrypoint(self):
         result = subprocess.run([sys.executable, "-m", "talos", "--version"], cwd=ROOT, capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "Talos 0.1.0")
+        self.assertEqual(result.stdout.strip(), "Talos 0.2.0")
 
     def test_help_exposes_only_implemented_native_stages(self):
         code, stdout, stderr = self.run_cli("--help")

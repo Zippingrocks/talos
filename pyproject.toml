@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "talos-cod"
-version = "0.1.0"
+version = "0.2.0"
 description = "Direct BO1 to BO3 binary fastfile conversion foundation"
 readme = "README.md"
 requires-python = ">=3.10"

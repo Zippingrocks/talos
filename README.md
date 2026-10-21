@@ -23,12 +23,12 @@ or write a BO3 fastfile.
 | BO1 container inspection | Implemented for unsigned little-endian PC `IWffu100`, version `473`; reports SHA-256, size, and explicit support status. |
 | BO1 bounded decompression | Implemented for one complete zlib stream and the 36-byte XFile size header. |
 | T5 allocation graph | Implemented through Hermes: every allocation byte, pointer link, root asset, script string and the exact T5 layout are retained and independently validated. |
-| Semantic T5 asset IR | Not implemented; decoded root assets still need type-specific lifting and unsupported-member accounting. |
+| Semantic T5 asset IR | Implemented as a lossless typed index over the Hermes graph: typed allocation extents, root fields and values, pointer ownership, asset identity/dependencies, and explicit byte coverage. Type-specific BO1-to-BO3 policies remain future work. |
 | BO1-to-BO3 asset conversion | Not implemented. |
 | Native T7 zone serialization and `.ff` writing | Not implemented. |
 | End-to-end BO3 validation | Not performed. |
 
-The decoded graph is still BO1 data. It is not relabeled or reported as BO3
+The semantic IR is still BO1 data. It is not relabeled or reported as BO3
 output, and no `convert` command exists yet.
 
 ## Commands
@@ -51,22 +51,33 @@ To decode the complete T5 asset graph, build
 py -3 -m talos decode "C:\Games\Black Ops\zone\Common\zombie_theater.ff" `
   --hermes "C:\Tools\Hermes\hermes.exe" `
   --output local\zombie_theater-t5
+
+py -3 -m talos lift local\zombie_theater-t5 `
+  --output local\zombie_theater-t5-semantic.json
+
+py -3 -m talos catalog local\zombie_theater-t5 local\common-t5 `
+  --output local\zombie-source-catalog.json
 ```
 
-The no-overwrite output contains `manifest.json`, `graph.bin`,
+The no-overwrite decode output contains `manifest.json`, `graph.bin`,
 `t5-layout.json`, and `report.json`. Talos rejects incomplete walks, mismatched
 block accounting, unresolved pointers, malformed binary extents, and out-of-range
-links. See [the T5 graph contract](docs/T5_ZONE_GRAPH.md).
+links. `lift` writes a separate, no-overwrite semantic index while retaining
+`graph.bin` as the exact binary authority. See [the T5 graph contract](docs/T5_ZONE_GRAPH.md)
+and [semantic T5 IR contract](docs/T5_SEMANTIC_IR.md).
+`catalog` fingerprints complete asset graph closures independently of local node
+numbers, deduplicates matching identities across zones, and reports conflicting
+definitions instead of silently choosing one.
 
 Signed/encrypted files, console profiles, and other versions remain outside this
 support boundary.
 
 ## Integration and next work
 
-The lossless graph is the implemented binary boundary between Hermes and Talos.
-Talos must next lift supported T5 roots into semantic binary asset IR, establish
-verified T7 layouts and pointer/fixup rules, translate dependencies, and serialize
-native BO3 zones and containers. BO1 data never passes through WaW.
+The lossless graph and typed semantic index are the implemented BO1 boundary
+between Hermes and Talos. Talos must next establish verified T7 layouts and
+pointer/fixup rules, translate dependencies, and serialize native BO3 zones and
+containers. BO1 data never passes through WaW.
 
 See [the binary pipeline](docs/BINARY_PIPELINE.md) and
 [integration evidence](docs/INTEGRATION.md). The source-export detour from
@@ -82,8 +93,10 @@ py -3 -m unittest discover -s tests -v
 The suite covers container corruption and limits, graph extents and pointer
 targets, deterministic inventories, subprocess failure, and no-overwrite rules.
 A local retail validation on October 20, 2026 decoded `zombie_theater.ff`
-completely: 908 root assets, 68,870 graph nodes, 75,315 chunks, 169,490 links,
-789 script strings, and 111,197,324 allocation bytes. The source SHA-256 was
+completely: 908 root assets, 3,628 total loaded assets, 68,870 graph nodes,
+75,315 chunks, 169,490 links, 789 script strings, and 111,197,324 allocation
+bytes. The semantic pass also decoded 2,794 map entities and all 1,546 cells of
+the map StringTable. The source SHA-256 was
 `970db88bb5ae9aa1d3875cdbd55d43212f22ee55096ce251f596d4a38a776786`.
 
 That proves the source-decode boundary for that installed file. It does not prove

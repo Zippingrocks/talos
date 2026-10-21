@@ -10,6 +10,8 @@ from . import __version__
 from .fastfile import inspect_fastfile, unpack_fastfile
 from .hermes_adapter import decode_with_hermes
 from .io_utils import json_text, read_bounded, write_new_file
+from .t5_semantic import lift_bundle
+from .t5_catalog import build_catalog
 
 
 MIB = 1024 * 1024
@@ -27,8 +29,9 @@ def parser() -> argparse.ArgumentParser:
         prog="talos",
         description=(
             "Direct BO1-to-BO3 binary fastfile conversion foundation. "
-            "Implemented: BO1 inspection, unpacking, and lossless Hermes T5 graph decode. "
-            "Semantic conversion and native BO3 fastfile writing are not implemented yet."
+            "Implemented: BO1 inspection, unpacking, lossless Hermes T5 graph decode, "
+            "and typed T5 semantic lifting. BO1-to-BO3 asset conversion and native "
+            "BO3 fastfile writing are not implemented yet."
         ),
     )
     root.add_argument("--version", action="version", version=f"Talos {__version__}")
@@ -46,6 +49,14 @@ def parser() -> argparse.ArgumentParser:
     sub.add_argument("input", type=Path)
     sub.add_argument("--hermes", type=Path, required=True, help="Hermes executable with export-talos support")
     sub.add_argument("--output", type=Path, required=True, help="new Talos T5 binary-source bundle")
+
+    sub = commands.add_parser("lift", help="lift a validated Hermes graph into typed semantic T5 IR")
+    sub.add_argument("input", type=Path, help="decoded Talos/Hermes bundle directory")
+    sub.add_argument("--output", type=Path, required=True, help="new semantic IR JSON file")
+
+    sub = commands.add_parser("catalog", help="catalog and compare assets across decoded T5 zones")
+    sub.add_argument("inputs", type=Path, nargs="+", help="decoded Talos/Hermes bundle directories")
+    sub.add_argument("--output", type=Path, required=True, help="new T5 asset catalog JSON file")
     return root
 
 
@@ -54,6 +65,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "decode":
             report = decode_with_hermes(args.input, args.hermes, args.output)
+            print(json_text(report), end="")
+            return 0
+        if args.command == "lift":
+            report = lift_bundle(args.input, args.output)
+            print(json_text(report), end="")
+            return 0
+        if args.command == "catalog":
+            report = build_catalog(args.inputs, args.output)
             print(json_text(report), end="")
             return 0
         data = read_bounded(args.input, args.max_input_mib * MIB)

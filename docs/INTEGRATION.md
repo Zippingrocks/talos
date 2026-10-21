@@ -22,12 +22,12 @@ duplicating any BO3 binary implementation.
 ### Hermes
 
 Integrated source:
-[`KingslayerKyle/Hermes` commit `19935492d9f3667b2b397a7b2c1d0980bf1d9ea2`](https://github.com/KingslayerKyle/Hermes/commit/19935492d9f3667b2b397a7b2c1d0980bf1d9ea2).
+[`KingslayerKyle/Hermes` commit `8dfb9653428ae562f9f9396a05bf8370959a7e56`](https://github.com/KingslayerKyle/Hermes/commit/8dfb9653428ae562f9f9396a05bf8370959a7e56).
 
 Hermes supplies the implemented T5 container reader, generated T5 type/load
 layout, complete loader walk, allocation graph, resolved pointer topology, asset
 roots, and script strings. `hermes export-talos` publishes schema
-`hermes_t5_zone_graph` version 1, documented in
+`hermes_t5_zone_graph` version 2, documented in
 [T5_ZONE_GRAPH.md](T5_ZONE_GRAPH.md).
 
 Talos validates every file, graph extent, link location, target location, asset
@@ -64,8 +64,8 @@ bytes. Proprietary output is not committed.
 
 ## Remaining binary stages
 
-1. Lift each supported T5 root into versioned semantic IR while retaining opaque
-   source fields and reporting every unsupported member and dependency.
+1. Extend type-specific semantic policies from the implemented lossless T5 IR
+   while retaining every raw member and explicit dependency edge.
 2. Establish primary evidence for native T7 asset IDs, structures, alignment,
    pointer/fixup encoding, zone blocks, compression, and container framing.
 3. Translate render worlds, collision, placements, materials/images, entities,

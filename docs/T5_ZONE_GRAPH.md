@@ -1,4 +1,4 @@
-# Hermes T5 zone graph v1
+# Hermes T5 zone graph v2
 
 Talos uses Hermes as its authoritative Black Ops 1 decoder. The boundary is a
 lossless source bundle, not a WaW fastfile and not a claim that the assets have
@@ -25,7 +25,7 @@ seven XFile block reservations, and resolves every back-reference.
 | `t5-layout.json` | The exact generated T5 type/member/load specification Hermes used to walk the zone. |
 | `report.json` | Talos source identity, hashes, inventory and explicit remaining target work. Added only after validation. |
 
-The manifest schema identifier is `hermes_t5_zone_graph`, version `1`. Node and
+The manifest schema identifier is `hermes_t5_zone_graph`, version `2`. Node and
 asset IDs are zero-based, contiguous and ordered. Each chunk names a byte extent
 inside `graph.bin`; the extents must cover that file exactly with no overlap or
 gap. Every pointer location and target is validated against those extents.
@@ -41,7 +41,11 @@ Link kinds preserve T5 loader semantics:
 
 Each root asset records its T5 type index/name, layout struct, root node, decoded
 name when available, reachable-node count, and references to other root assets.
-The original asset-table order and script-string indices are retained.
+The original asset-table order and script-string indices are retained. The
+`loaded_assets` array additionally records every root and nested asset load with
+its owning root, parent asset, nesting depth, identity, graph node, and exact source-stream
+extent. Nested records expose asset references that must be resolved across the
+map and its companion zones.
 
 ## What this proves
 
@@ -50,9 +54,8 @@ an internally consistent allocation graph without dropping opaque bytes. It
 gives target work a pinned layout and exact pointer topology instead of forcing
 Damocles to rediscover BO1 serialization.
 
-It does **not** prove that a BO1 asset has a BO3 equivalent. The next Talos IR
-version must lift supported root assets into semantic records for worlds,
-collision, materials, images, models, animation, sound, FX, scripts and gameplay.
-Unsupported fields and dependencies must remain visible. Only the official BO3
-Mod Tools linker produces a BO3 fastfile, and only in-game testing establishes
-runtime fidelity.
+It does **not** prove that a BO1 asset has a BO3 equivalent. `talos lift` adds
+typed semantic T5 records, but BO1-to-BO3 policies and native T7 serialization
+remain separate stages. Unsupported fields and dependencies must remain
+visible. Only independent target parsing and BO3 loader testing establish
+binary and runtime fidelity.

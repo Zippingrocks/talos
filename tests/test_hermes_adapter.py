@@ -13,11 +13,28 @@ def write_bundle(path: Path, *, source_file: str = "map.ff", source_bytes: int =
     path.mkdir()
     graph = bytes(20)
     (path / "graph.bin").write_bytes(graph)
-    layout = b'{"game":"T5"}'
+    layout_document = {
+        "game": "T5",
+        "types": [
+            {
+                "name": "RawFile",
+                "size": 12,
+                "members": [
+                    {"name": "name", "offset": 0, "sizes": [4, 1], "type": None,
+                     "tname": "char", "mods": [{"p": None}], "string": True},
+                    {"name": "len", "offset": 4, "sizes": [4], "type": None,
+                     "tname": "int", "mods": [], "string": False},
+                    {"name": "buffer", "offset": 8, "sizes": [4, 1], "type": None,
+                     "tname": "char", "mods": [{"p": None}], "string": False},
+                ],
+            }
+        ],
+    }
+    layout = json.dumps(layout_document).encode()
     (path / "t5-layout.json").write_bytes(layout)
     manifest = {
         "schema": "hermes_t5_zone_graph",
-        "schema_version": 1,
+        "schema_version": 2,
         "source_game": "black_ops_1",
         "source_profile": "pc_unsigned_iwffu100_v473",
         "source_file": source_file,
@@ -50,6 +67,20 @@ def write_bundle(path: Path, *, source_file: str = "map.ff", source_bytes: int =
                 "dependency_asset_indices": [],
             }
         ],
+        "loaded_assets": [
+            {
+                "index": 0,
+                "root_asset_index": 0,
+                "depth": 0,
+                "parent_loaded_asset_index": None,
+                "type_name": "RawFile",
+                "struct_name": "RawFile",
+                "name": "maps/example.gsc",
+                "root_node": 1,
+                "stream_start": 0,
+                "stream_end": 12,
+            }
+        ],
         "graph": {
             "external_size": 0,
             "script_strings_node": None,
@@ -76,7 +107,7 @@ def write_bundle(path: Path, *, source_file: str = "map.ff", source_bytes: int =
                 {
                     "id": 1,
                     "kind": "struct",
-                    "type_index": 100,
+                    "type_index": 0,
                     "type_name": "RawFile",
                     "chunks": [
                         {"index": 0, "data_offset": 8, "data_bytes": 12, "links": []}
@@ -96,6 +127,7 @@ class HermesBundleTests(unittest.TestCase):
             document, inventory = validate_bundle(bundle)
             self.assertEqual(document["assets"][0]["name"], "maps/example.gsc")
             self.assertEqual(inventory["assets"], 1)
+            self.assertEqual(inventory["loaded_assets"], 1)
             self.assertEqual(inventory["asset_types"], {"rawfile": 1})
             self.assertEqual(inventory["nodes"], 2)
             self.assertEqual(inventory["links"], 1)
@@ -110,6 +142,18 @@ class HermesBundleTests(unittest.TestCase):
             manifest["graph"]["nodes"][0]["chunks"][0]["links"][0]["target"]["node"] = 9
             path.write_text(json.dumps(manifest))
             with self.assertRaisesRegex(HermesAdapterError, "outside"):
+                validate_bundle(bundle)
+
+    def test_rejects_an_invalid_loaded_asset_parent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory) / "bundle"
+            write_bundle(bundle)
+            path = bundle / "manifest.json"
+            manifest = json.loads(path.read_text())
+            manifest["loaded_assets"][0]["depth"] = 1
+            manifest["loaded_assets"][0]["parent_loaded_asset_index"] = 0
+            path.write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(HermesAdapterError, "parent"):
                 validate_bundle(bundle)
 
     def test_decode_invokes_hermes_validates_and_never_overwrites(self):

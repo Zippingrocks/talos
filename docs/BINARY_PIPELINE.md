@@ -13,7 +13,7 @@ The required stages are:
 | Stage | Required work | Current state |
 | --- | --- | --- |
 | T5 container | Identify the source profile, validate compression, and recover serialized zone bytes. | Implemented only for unsigned little-endian PC `IWffu100` version `473`. |
-| T5 zone and assets | Read stream/block organization, asset records, names, references, and payloads with bounds checks. | Only the 36-byte XFile size header is read; asset decoding is unimplemented. |
+| T5 zone and assets | Read stream/block organization, asset records, names, references, and payloads with bounds checks. | Hermes completely walks the T5 allocation graph; Talos validates it and lifts typed allocation extents, root fields, links, identities and dependencies into semantic IR. Type-specific conversion policy is separate. |
 | Asset conversion | Translate supported BO1 asset semantics and dependencies into BO3 representations. | Unimplemented. |
 | Native T7 zone serialization | Emit verified BO3 structures, asset tables, alignment, pointer/reference encoding, and fixups. | Unimplemented. |
 | BO3 container | Write the required target header, compression/framing, and other verified container fields. | Unimplemented. |
@@ -48,9 +48,11 @@ scripts and other dependencies. Each asset type needs explicit T5 decoding,
 conversion, and T7 serialization support. Unresolved required assets stop a
 claimed complete conversion; they are not silently dropped or replaced.
 
-There is currently no implemented binary asset IR schema or public adapter API.
-The former brush/entity JSON contract is removed. New schema and adapter
-contracts should follow the actual donor structures and verified target needs.
+Schema `talos_t5_semantic_ir` version 1 is the implemented source-side semantic
+index. It refers back to the exact graph bytes rather than duplicating or
+normalizing them, records every typed allocation extent, and decodes only scalar
+root members proven by the embedded layout. Ambiguous unions and other
+uninterpreted values remain exact raw bytes. See [T5_SEMANTIC_IR.md](T5_SEMANTIC_IR.md).
 
 ## Evidence and completion criteria
 

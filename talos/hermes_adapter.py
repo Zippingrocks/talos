@@ -18,7 +18,7 @@ from .io_utils import json_text, write_new_file
 
 
 SCHEMA = "hermes_t5_zone_graph"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MANIFEST = "manifest.json"
 GRAPH_DATA = "graph.bin"
 LAYOUT = "t5-layout.json"
@@ -98,18 +98,20 @@ def validate_bundle(bundle: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     if not bundle.is_dir():
         raise HermesAdapterError(f"Hermes bundle is not a directory: {bundle}")
     expected_files = {MANIFEST, GRAPH_DATA, LAYOUT}
+    optional_files = {"report.json"}
     actual_files = {path.name for path in bundle.iterdir() if path.is_file()}
-    if actual_files != expected_files:
+    if not expected_files.issubset(actual_files) or actual_files - expected_files - optional_files:
         raise HermesAdapterError(
-            "Hermes bundle must contain exactly "
+            "Hermes bundle must contain "
             + ", ".join(sorted(expected_files))
-            + f"; found {', '.join(sorted(actual_files)) or 'no files'}"
+            + " and only recognized Talos metadata; found "
+            + (", ".join(sorted(actual_files)) or "no files")
         )
     document = _object(_read_json(bundle / MANIFEST, MAX_MANIFEST_BYTES), "manifest")
     required = {
         "schema", "schema_version", "source_game", "source_profile", "source_file",
         "fastfile", "xfile", "walk", "layout", "graph_data", "script_strings",
-        "assets", "graph",
+        "assets", "loaded_assets", "graph",
     }
     if set(document) != required:
         raise HermesAdapterError("manifest has unknown or missing top-level members")
@@ -210,9 +212,49 @@ def validate_bundle(bundle: Path) -> tuple[dict[str, Any], dict[str, Any]]:
             if _integer(dependency, "asset dependency") >= len(assets) or dependency == index:
                 raise HermesAdapterError("asset dependency index is invalid")
 
+    loaded_assets = _array(document.get("loaded_assets"), "loaded_assets")
+    loaded_types: Counter[str] = Counter()
+    for index, raw_asset in enumerate(loaded_assets):
+        asset = _object(raw_asset, f"loaded_assets[{index}]")
+        if asset.get("index") != index:
+            raise HermesAdapterError("loaded asset indices must be contiguous and ordered")
+        root_index = _integer(asset.get("root_asset_index"), "loaded asset root_asset_index")
+        if root_index >= len(assets):
+            raise HermesAdapterError("loaded asset root index is invalid")
+        depth = _integer(asset.get("depth"), "loaded asset depth")
+        parent = asset.get("parent_loaded_asset_index")
+        if parent is None:
+            if depth != 0:
+                raise HermesAdapterError("nested loaded asset has no parent")
+        else:
+            parent = _integer(parent, "loaded asset parent_loaded_asset_index")
+            if parent >= index:
+                raise HermesAdapterError("loaded asset parent must precede its child")
+            parent_depth = loaded_assets[parent].get("depth")
+            if not isinstance(parent_depth, int) or depth != parent_depth + 1:
+                raise HermesAdapterError("loaded asset depth does not follow its parent")
+        type_name = asset.get("type_name")
+        if not isinstance(type_name, str) or not type_name:
+            raise HermesAdapterError("loaded asset type_name must be a non-empty string")
+        if asset.get("struct_name") != type_name:
+            raise HermesAdapterError("loaded asset struct_name must match type_name")
+        name = asset.get("name")
+        if name is not None and not isinstance(name, str):
+            raise HermesAdapterError("loaded asset name must be a string or null")
+        root = asset.get("root_node")
+        if root is not None and _integer(root, "loaded asset root_node") >= len(nodes):
+            raise HermesAdapterError("loaded asset root points outside the decoded graph")
+        start = _integer(asset.get("stream_start"), "loaded asset stream_start")
+        end = _integer(asset.get("stream_end"), "loaded asset stream_end")
+        if end < start or end > document["fastfile"]["decompressed_zone_bytes"]:
+            raise HermesAdapterError("loaded asset stream extent is invalid")
+        loaded_types[type_name] += 1
+
     return document, {
         "assets": len(assets),
         "asset_types": dict(sorted(types.items())),
+        "loaded_assets": len(loaded_assets),
+        "loaded_asset_types": dict(sorted(loaded_types.items())),
         "script_strings": len(_array(document["script_strings"], "script_strings")),
         "nodes": len(nodes),
         "chunks": sum(len(node["chunks"]) for node in nodes),
@@ -279,18 +321,19 @@ def decode_with_hermes(source: Path, hermes: Path, output: Path) -> dict[str, An
                 "zone_walk": "complete",
                 "pointer_graph": "validated",
                 "t5_layout": "included",
-                "semantic_asset_conversion": "not_run",
-                "bo3_source_generation": "not_run",
-                "bo3_mod_tools_compile": "not_run",
+                "t5_semantic_lift": "available_not_run",
+                "bo1_to_bo3_asset_conversion": "not_run",
+                "t7_zone_serialization": "not_run",
+                "bo3_container_write": "not_run",
                 "bo3_runtime": "not_run",
             },
             "fastfile_written": False,
             "outputs": outputs,
             "remaining_work": [
-                "Translate each supported T5 asset from the decoded graph into versioned Talos semantic IR.",
+                "Lift the decoded graph with `talos lift` into versioned Talos semantic T5 IR.",
                 "Convert BO1 materials, images, models, animation, audio, FX, world and collision data for BO3.",
-                "Emit a complete BO3 Mod Tools project and compile it with the official linker.",
-                "Validate the compiled map in BO3 and report unsupported assets without omission.",
+                "Serialize converted assets into a native T7 zone with verified pointers and fixups.",
+                "Write the supported BO3 container profile and validate it independently and in BO3.",
             ],
         }
         write_new_file(bundle / "report.json", json_text(report).encode("utf-8"))

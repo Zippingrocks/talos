@@ -1,0 +1,26 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unittest:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run synthetic regression tests
+        run: python -m unittest discover -s tests -v
+      - name: Exercise the documented source conversion
+        run: python -m talos convert-map examples/synthetic_brush.map --name zm_talos_test --material-map examples/materials.json --output build/ci-example

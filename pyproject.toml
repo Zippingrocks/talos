@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "talos-cod"
+version = "0.1.0"
+description = "Black Ops 1 input inspection and BO3 Radiant source conversion"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+talos = "talos.cli:main"
+
+[tool.setuptools]
+packages = ["talos"]

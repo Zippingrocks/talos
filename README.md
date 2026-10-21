@@ -57,6 +57,10 @@ py -3 -m talos lift local\zombie_theater-t5 `
 
 py -3 -m talos catalog local\zombie_theater-t5 local\common-t5 `
   --output local\zombie-source-catalog.json
+
+py -3 -m talos payloads local\zombie_theater-t5 `
+  --iwd-root "C:\Games\Black Ops\main" `
+  --output local\zombie-image-payloads.json
 ```
 
 The no-overwrite decode output contains `manifest.json`, `graph.bin`,
@@ -68,6 +72,11 @@ and [semantic T5 IR contract](docs/T5_SEMANTIC_IR.md).
 `catalog` fingerprints complete asset graph closures independently of local node
 numbers, deduplicates matching identities across zones, and reports conflicting
 definitions instead of silently choosing one.
+`payloads` inventories all loaded `GfxImage` identities against BO1 IWD central
+directories, distinguishes exact matches, identical duplicate sources,
+conflicting sources and non-matches, and can SHA-256 matching IWI payloads with
+`--hash-matches`. Runtime (`*`), generated (`,`) and engine (`$`) name signals
+are reported but never treated as guessed files.
 
 Signed/encrypted files, console profiles, and other versions remain outside this
 support boundary.
@@ -96,7 +105,11 @@ A local retail validation on October 20, 2026 decoded `zombie_theater.ff`
 completely: 908 root assets, 3,628 total loaded assets, 68,870 graph nodes,
 75,315 chunks, 169,490 links, 789 script strings, and 111,197,324 allocation
 bytes. The semantic pass also decoded 2,794 map entities and all 1,546 cells of
-the map StringTable. The source SHA-256 was
+the map StringTable, retained all 326 embedded loaded-sound payloads (7,005,264
+bytes), and found exact IWD members for all 26 streamed sounds. Of 1,318 image
+identities, 1,240 had exact IWD matches; all 78 non-matches carried explicit
+runtime/generated/engine prefixes, and no ordinary filename was missing. The
+source SHA-256 was
 `970db88bb5ae9aa1d3875cdbd55d43212f22ee55096ce251f596d4a38a776786`.
 
 That proves the source-decode boundary for that installed file. It does not prove

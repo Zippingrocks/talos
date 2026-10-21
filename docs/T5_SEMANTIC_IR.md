@@ -39,3 +39,12 @@ zones. A single map fastfile is not necessarily a self-contained asset closure.
 parent/child asset edges, and computes Merkle fingerprints over asset graph
 closures. Matching identities with distinct fingerprints are explicit
 conflicts; identical duplicates are safe to deduplicate.
+
+Streamed BO1 images may live outside the fastfile. `talos payloads` resolves
+every loaded `GfxImage` name against IWD image members case-insensitively,
+records sizes and CRC32 metadata, detects conflicting duplicate sources, and can
+cryptographically hash matched IWI bytes. Names carrying runtime, generated, or
+engine prefixes remain explicit non-file signals rather than fabricated paths.
+The same command reads `StreamedSound` filenames from typed graph nodes and
+resolves them against IWD members. `LoadedSound` and `PrimedSound` nodes retain
+their exact in-graph payload extents and SHA-256 identities in semantic IR.

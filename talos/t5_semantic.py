@@ -433,6 +433,45 @@ def _specialization(
         return result
     if struct_name == "StringTable":
         return _string_table(document, graph, fields)
+    if struct_name == "LoadedSound":
+        sound = _field(fields, "sound").get("inline")
+        if not isinstance(sound, dict) or not sound.get("elements"):
+            raise T5SemanticError("LoadedSound has no inline snd_asset metadata")
+        metadata_fields = sound["elements"][0]["fields"]
+        data_size = _field(metadata_fields, "data_size").get("value")
+        if not isinstance(data_size, int) or data_size < 0:
+            raise T5SemanticError("LoadedSound data size is invalid")
+        data = _linked_bytes(document, graph, _field(metadata_fields, "data"))
+        metadata = {
+            name: _field(metadata_fields, name).get("value")
+            for name in (
+                "version", "frame_count", "frame_rate", "channel_count", "header_size",
+                "block_size", "buffer_size", "format", "channel_flags", "flags",
+                "seek_table_count", "data_size",
+            )
+        }
+        return {
+            "kind": "loaded_sound",
+            "name": _field(fields, "name").get("string"),
+            "metadata": metadata,
+            "payload": None if data is None else _payload(data, data_size),
+        }
+    if struct_name == "PrimedSound":
+        size = _field(fields, "size").get("value")
+        if not isinstance(size, int) or size < 0:
+            raise T5SemanticError("PrimedSound size is invalid")
+        data = _linked_bytes(document, graph, _field(fields, "buffer"))
+        return {
+            "kind": "primed_sound",
+            "name": _field(fields, "name").get("string"),
+            "payload": None if data is None else _payload(data, size),
+        }
+    if struct_name == "StreamedSound":
+        return {
+            "kind": "streamed_sound",
+            "filename": _field(fields, "filename").get("string"),
+            "primed_sound_link": _field(fields, "primeSnd").get("link"),
+        }
     return None
 
 
@@ -473,7 +512,11 @@ def _typed_nodes(
             ]
             # Some semantic map data is embedded under another root (notably MapEnts
             # inside clipMap_t).  Promote it wherever the graph proves its type.
-            if types[type_index]["name"] == "MapEnts" and chunks and chunks[0]["data_bytes"] >= size:
+            semantic_node_types = {
+                "MapEnts", "LoadedSound", "PrimedSound", "StreamedSound",
+                "SoundFile", "snd_alias_t", "snd_alias_list_t",
+            }
+            if types[type_index]["name"] in semantic_node_types and chunks and chunks[0]["data_bytes"] >= size:
                 fields, _ = _root_fields(document, graph, types, types[type_index], node["id"])
                 entry["fields"] = fields
                 entry["semantic"] = _specialization(

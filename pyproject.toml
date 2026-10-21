@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "talos-cod"
 version = "0.1.0"
-description = "Black Ops 1 input inspection and BO3 Radiant source conversion"
+description = "Direct BO1 to BO3 binary fastfile conversion foundation"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []

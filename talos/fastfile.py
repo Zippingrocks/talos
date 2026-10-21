@@ -108,6 +108,7 @@ def inspect_fastfile(data: bytes) -> dict[str, Any]:
         "reason": reason,
         "validation": "header_only",
         "assets_decoded": False,
+        "target_fastfile_written": False,
     }
 
 

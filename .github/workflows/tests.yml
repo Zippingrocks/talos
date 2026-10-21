@@ -22,5 +22,5 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Run synthetic regression tests
         run: python -m unittest discover -s tests -v
-      - name: Exercise the documented source conversion
-        run: python -m talos convert-map examples/synthetic_brush.map --name zm_talos_test --material-map examples/materials.json --output build/ci-example
+      - name: Verify the native fastfile CLI entrypoint
+        run: python -m talos --version

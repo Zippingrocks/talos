@@ -1,58 +1,53 @@
-# Integration findings
+# Integration evidence
 
-## Intended ownership
+## Required ownership
+
+Talos must convert **BO1 `.ff` directly into BO3 `.ff`**. The user confirmed this
+binary architecture; it supersedes the earlier source-export implementation and
+any conflicting donor plan.
 
 | Component | Responsibility |
 | --- | --- |
-| Hermes source adapter | Decode the original BO1 container/zone/assets and preserve source identities and dependencies. |
-| Talos map IR | Hold explicit, validated map data independently of either engine. |
-| BO3 source backend | Translate that data into BO3 Radiant, material/model source assets, and zone inputs. |
-| BO3 Mod Tools | Compile/link a complete target project; game testing establishes fidelity. |
+| BO1 input adapter | Decode T5 containers, zones, asset records, and dependencies; reuse verified Hermes knowledge. |
+| Talos conversion layer | Preserve source meaning and translate each supported asset into its BO3 counterpart. |
+| Native BO3 serializer | Write T7 asset layouts, zone structures, references, and fixups using verified binary rules; reuse relevant Damocles code when available. |
+| BO3 container writer | Package the serialized target zone into the supported BO3 `.ff` profile. |
+| Validation | Check source/target inventories, target binary structure, loader acceptance, and runtime fidelity separately. |
 
-The useful marriage is the BO1-reading half and the BO3-output half. Hermes's WaW
-writer and Damocles's BO4 reader are not needed for this direction. There is no
-reason to invent a BO1 → WaW → BO3 intermediate binary conversion.
+Hermes's WaW writer and Damocles's BO4 reader are not the halves needed here.
+Talos should preserve BO1 data directly for its BO3 target. It does not use
+Radiant, `.map` interchange, source export, or Mod Tools compilation as a bridge.
 
-## Donor audit
+## Accessible donor snapshots
 
-The repositories were checked on October 20, 2026 (America/Los_Angeles).
+The connected repositories were inspected on October 20, 2026
+(America/Los_Angeles).
 
 ### Damocles
 
-Audited commit: [`ae16724f4b6a93dbc3f1f731bce47fc4736215b2`](https://github.com/Zippingrocks/Damocles/commit/ae16724f4b6a93dbc3f1f731bce47fc4736215b2).
-Only `main` was returned by the connected branch inventory.
-
-- [`src/pipeline.rs`](https://github.com/Zippingrocks/Damocles/blob/ae16724f4b6a93dbc3f1f731bce47fc4736215b2/src/pipeline.rs)
-  plans BO3 Mod Tools source generation, marks the target-source stage blocked,
-  and unconditionally stops conversion at the unmet T8 container stage.
-- [`src/ir.rs`](https://github.com/Zippingrocks/Damocles/blob/ae16724f4b6a93dbc3f1f731bce47fc4736215b2/src/ir.rs)
-  contains asset metadata with T8/T7-specific validation, not recovered map
-  geometry.
-- [`docs/ARCHITECTURE.md`](https://github.com/Zippingrocks/Damocles/blob/ae16724f4b6a93dbc3f1f731bce47fc4736215b2/docs/ARCHITECTURE.md)
-  supplies the target strategy: source export followed by the official linker.
-
-This revision contributes architecture and accounting rules, not a working BO3
-backend. A more advanced local or unpushed revision should be compared before
-duplicating any existing implementation.
+The accessible revision was
+[`ae16724f4b6a93dbc3f1f731bce47fc4736215b2`](https://github.com/Zippingrocks/Damocles/commit/ae16724f4b6a93dbc3f1f731bce47fc4736215b2).
+Its [pipeline](https://github.com/Zippingrocks/Damocles/blob/ae16724f4b6a93dbc3f1f731bce47fc4736215b2/src/pipeline.rs)
+stops at an unmet container-decoding stage, and its
+[IR](https://github.com/Zippingrocks/Damocles/blob/ae16724f4b6a93dbc3f1f731bce47fc4736215b2/src/ir.rs)
+holds asset metadata. That snapshot contains no native T7 writer to integrate.
+Its source-output plan is not authority for Talos. Compare any more advanced
+donor revision before duplicating its existing binary implementation.
 
 ### Hermes
 
-`Zippingrocks/Hermes` was not available through the connected GitHub account, and
-the account's repository inventory did not contain a Hermes project. This does
-not rule out a local checkout or a repository with another owner/name.
+The working Hermes source was not available in the connected repository
+inventory. [Damocles's findings](https://github.com/Zippingrocks/Damocles/blob/ae16724f4b6a93dbc3f1f731bce47fc4736215b2/docs/FINDINGS.md)
+identify revision `d25cda930903e2c6041736fe0f523c4bd2dcf4f9` and modules
+`src/game.rs`, `src/fastfile.rs`, `src/zone.rs`, and `tools/zonecode.py`.
+These identify the intended decoder for a future adapter; they do not establish
+its current API. No unrelated project sharing the name was substituted.
 
-[Damocles's findings](https://github.com/Zippingrocks/Damocles/blob/ae16724f4b6a93dbc3f1f731bce47fc4736215b2/docs/FINDINGS.md)
-record a local Hermes revision `d25cda930903e2c6041736fe0f523c4bd2dcf4f9` and the
-modules `src/game.rs`, `src/fastfile.rs`, `src/zone.rs`, and `tools/zonecode.py`.
-Those are leads, not an independently verified Hermes API. Its current source,
-license, decoded asset structures, and usable export interface remain to be
-inspected. No third-party project sharing the name was substituted.
+## Verified BO1 container facts
 
-## Independently verified format references
-
-### Unsigned BO1 PC container
-
-OpenAssetTools commit [`06a121f7cf6658ea3989b3478b6275ce8c1c7b6d`](https://github.com/Laupetin/OpenAssetTools/commit/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d):
+Talos independently implements a narrow container reader using these primary
+references from OpenAssetTools commit
+[`06a121f7cf6658ea3989b3478b6275ce8c1c7b6d`](https://github.com/Laupetin/OpenAssetTools/commit/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d):
 
 | Fact used by Talos | Primary source |
 | --- | --- |
@@ -62,42 +57,19 @@ OpenAssetTools commit [`06a121f7cf6658ea3989b3478b6275ce8c1c7b6d`](https://githu
 | Two initial unsigned size fields | [StepLoadZoneSizes.cpp](https://github.com/Laupetin/OpenAssetTools/blob/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d/src/ZoneLoading/Loading/Steps/StepLoadZoneSizes.cpp) |
 | Block-size loading and order | [StepAllocXBlocks.cpp](https://github.com/Laupetin/OpenAssetTools/blob/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d/src/ZoneLoading/Loading/Steps/StepAllocXBlocks.cpp), [T5_Assets.h](https://github.com/Laupetin/OpenAssetTools/blob/06a121f7cf6658ea3989b3478b6275ce8c1c7b6d/src/Common/Game/T5/T5_Assets.h) |
 
-Talos independently implements these layout facts in Python. It does not vendor
-OpenAssetTools code, claim support for its entire asset reader, or treat declared
-allocation sizes as trusted allocations. Strict single-stream/trailing-byte
-rejection is a Talos support boundary; it is not a claim that every authentic
-file must have that exact padding behavior.
+No OpenAssetTools implementation is vendored. The current reader records the
+XFile allocation sizes without trusting them as allocations or equating them to
+the input length. Strict single-stream and trailing-byte rejection define
+Talos's supported profile, not a rule asserted for every authentic fastfile.
 
-### BO3 Radiant text
+## Correction history and next integration
 
-- [Native BO3 source example](https://github.com/kelson8/bo3-Zombies-Test-Map/blob/b20ca20b1b043276b6797513f51ffb10c77faea2/prefabs/stairs1.map)
-  establishes `iwmap 4`, entities, GUIDs, and the observed brush-face syntax.
-- Corvid's [face writer](https://github.com/KILLTUBE/corvid/blob/99b9ff7f47704725aee850d3936e20b565e613a0/modules/CoDMap/Face.py)
-  and [map writer](https://github.com/KILLTUBE/corvid/blob/99b9ff7f47704725aee850d3936e20b565e613a0/modules/CoDMap/Map.py)
-  independently corroborate the two six-value face records and output without
-  mandatory generated GUIDs.
+Commit [`18e6332`](https://github.com/Zippingrocks/talos/commit/18e633239da42e873d6688089c0c5f517d2c2eeb)
+introduced a source-export detour. That path is superseded and removed from the
+active tree; the historical implementation remains recoverable through Git.
 
-These sources inform syntax only. No third-party code or original map geometry
-is copied into Talos; fixtures are newly authored. Compiler acceptance and visual
-fidelity still require the official tools and real source/target comparisons.
-
-## Remaining executable stages
-
-1. **Connect the real Hermes decoder.** Pin its actual repository/revision,
-   inspect license and schemas, decode a locally supplied BO1 map, and populate
-   supported IR fields with an exhaustive unsupported-asset report.
-2. **Recover and preserve actual map content.** Resolve geometry, collision,
-   placements, material/image dependencies, entities, lighting data and scripts.
-   Add IR versions for data the current brush/entity subset cannot represent.
-3. **Translate BO1 assets and behaviors for BO3.** Names alone are insufficient;
-   emit usable material/model inputs and explicit gameplay/script adaptations.
-4. **Build a complete BO3 project.** Add validated GDT/zone sources and a linker
-   invocation based on an installed Mod Tools toolchain, then capture compiler
-   diagnostics and output identities.
-5. **Measure fidelity on a real map.** Compare positions, material appearance,
-   collision, spawn behavior and scripts. Record compiler/runtime results
-   independently of synthetic unit-test results.
-
-This update completes the supported container reader and the source-map
-import/IR/export slice. It leaves the unimplemented asset-decoding and target
-build stages explicit rather than inventing a successful `.ff` conversion.
+The retained implementation ends after container unpacking and XFile header
+inspection. The next binary stages are documented in
+[BINARY_PIPELINE.md](BINARY_PIPELINE.md). Neither a complete Hermes adapter nor a
+native BO3 writer is currently integrated, and no successful fastfile conversion
+is claimed.

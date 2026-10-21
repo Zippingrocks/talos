@@ -22,6 +22,24 @@ class T5PayloadError(ValueError):
     """External T5 payload sources are missing, corrupt, or ambiguous."""
 
 
+def _resolve_iwd_root(path: Path) -> tuple[Path, list[Path]]:
+    """Accept either BO1's install directory or its direct IWD directory."""
+    if not path.is_dir():
+        raise T5PayloadError(f"IWD root is not a directory: {path}")
+    candidates = [path]
+    main = path / "main"
+    if main.is_dir():
+        candidates.append(main)
+    for candidate in candidates:
+        archives = sorted(candidate.glob("*.iwd"), key=lambda item: item.name.casefold())
+        if archives:
+            return candidate, archives
+    raise T5PayloadError(
+        f"no IWD archives found in {path} or its main subdirectory; "
+        "pass a BO1 install directory or the directory containing iw_*.iwd"
+    )
+
+
 def _sha256_member(archive: Path, member: str) -> str:
     digest = hashlib.sha256()
     try:
@@ -39,8 +57,7 @@ def index_image_payloads(
     bundle, iwd_root, output = Path(bundle), Path(iwd_root), Path(output)
     if output.exists():
         raise T5PayloadError(f"output already exists: {output}")
-    if not iwd_root.is_dir():
-        raise T5PayloadError(f"IWD root is not a directory: {iwd_root}")
+    iwd_root, archives = _resolve_iwd_root(iwd_root)
     document, _ = validate_bundle(bundle)
     graph = (bundle / GRAPH_DATA).read_bytes()
     layout = json.loads((bundle / LAYOUT).read_text(encoding="utf-8-sig"))
@@ -71,7 +88,6 @@ def index_image_payloads(
             sound_paths[key].append(node["id"])
             original_sound_paths.setdefault(key, filename)
     sound_matches: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    archives = sorted(iwd_root.glob("*.iwd"), key=lambda path: path.name.casefold())
     for archive in archives:
         try:
             with zipfile.ZipFile(archive) as package:

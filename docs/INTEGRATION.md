@@ -62,6 +62,15 @@ zero unlinked back-references. Talos independently validated 908 assets, 68,870
 nodes, 75,315 chunks, 169,490 links, 789 script strings, and 111,197,324 graph
 bytes. Proprietary output is not committed.
 
+The expanded validation matrix covers 33 SP, Zombies, MP, UI, patch and
+localized zones with 31,898 roots, 61,910 loaded assets, 1,239,816 allocation
+nodes, 4,090,024 links, and 1,312,661,494 graph bytes. Retail files exercised 31
+of T5's 32 unique loadable structures, including real `SndPatch`, `EmblemSet`,
+`GameWorldMp`, DDL, `Glasses`, and `XGlobals` instances. The sole unobserved
+declaration, `PackIndex`, has an explicit synthetic semantic-lift fixture and is
+not misrepresented as retail evidence. See
+[T5_RETAIL_VALIDATION.md](T5_RETAIL_VALIDATION.md).
+
 ## Remaining binary stages
 
 1. Extend type-specific semantic policies from the implemented lossless T5 IR

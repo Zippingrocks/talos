@@ -61,7 +61,12 @@ def parser() -> argparse.ArgumentParser:
 
     sub = commands.add_parser("payloads", help="resolve decoded T5 image assets against BO1 IWD archives")
     sub.add_argument("input", type=Path, help="decoded Talos/Hermes bundle directory")
-    sub.add_argument("--iwd-root", type=Path, required=True, help="BO1 directory containing IWD archives")
+    sub.add_argument(
+        "--iwd-root",
+        type=Path,
+        required=True,
+        help="BO1 install directory or directory containing IWD archives",
+    )
     sub.add_argument("--output", type=Path, required=True, help="new external payload index JSON file")
     sub.add_argument("--hash-matches", action="store_true", help="read and SHA-256 every matching IWI")
     return root

@@ -4,11 +4,99 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from talos.t5_semantic import T5SemanticError, _entities, _inline_elements, lift_bundle
+from talos.t5_semantic import (
+    T5SemanticError,
+    _entities,
+    _inline_elements,
+    _script_string_array,
+    lift_bundle,
+)
 from tests.test_hermes_adapter import write_bundle
 
 
 class T5SemanticTests(unittest.TestCase):
+    def test_lifts_declared_pack_index_without_retail_fixture(self):
+        """T5 declares PackIndex, although sampled PC retail zones do not instantiate it."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bundle = root / "bundle"
+            write_bundle(bundle)
+            layout_path = bundle / "t5-layout.json"
+            layout = json.loads(layout_path.read_text())
+            scalar = lambda name, offset: {
+                "name": name, "offset": offset, "sizes": [4], "type": None,
+                "tname": "unsigned int", "mods": [], "string": False,
+            }
+            layout["types"] = [
+                {
+                    "name": "PackIndexHeader", "size": 20,
+                    "members": [scalar("magic", 0), scalar("timestamp", 4),
+                                scalar("count", 8), scalar("alignment", 12),
+                                scalar("data_start", 16)],
+                },
+                {
+                    "name": "PackIndexEntry", "size": 12,
+                    "members": [scalar("hash", 0), scalar("offset", 4), scalar("size", 8)],
+                },
+                {
+                    "name": "PackIndex", "size": 28,
+                    "members": [
+                        {"name": "name", "offset": 0, "sizes": [4, 1], "type": None,
+                         "tname": "char", "mods": [{"p": None}], "string": True},
+                        {"name": "header", "offset": 4, "sizes": [20], "type": 0,
+                         "tname": "PackIndexHeader", "mods": [], "string": False},
+                        {"name": "entries", "offset": 24, "sizes": [4, 12], "type": 1,
+                         "tname": "PackIndexEntry", "mods": [{"p": {"v": {"off": 8}}}],
+                         "string": False},
+                    ],
+                },
+            ]
+            layout_path.write_text(json.dumps(layout))
+            graph = bytes(8) + struct.pack("<IIIIIII", 0, 0x5041434B, 7, 0, 16, 32, 0)
+            (bundle / "graph.bin").write_bytes(graph)
+            manifest_path = bundle / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["layout"]["bytes"] = layout_path.stat().st_size
+            manifest["graph_data"]["bytes"] = len(graph)
+            manifest["assets"][0].update(
+                {"type_index": 38, "type_name": "packindex", "struct_name": "PackIndex",
+                 "name": "fixture", "reachable_nodes": 1}
+            )
+            manifest["loaded_assets"][0].update(
+                {"type_name": "PackIndex", "struct_name": "PackIndex", "name": "fixture",
+                 "stream_end": 28}
+            )
+            manifest["graph"]["nodes"][1].update(
+                {"type_index": 2, "type_name": "PackIndex",
+                 "chunks": [{"index": 0, "data_offset": 8, "data_bytes": 28, "links": []}]}
+            )
+            manifest_path.write_text(json.dumps(manifest))
+            output = root / "semantic.json"
+            lift_bundle(bundle, output)
+            result = json.loads(output.read_text())
+            fields = {field["name"]: field for field in result["assets"][0]["root"]["fields"]}
+            header_fields = fields["header"]["inline"]["elements"][0]["fields"]
+            self.assertEqual(header_fields[0]["value"], 0x5041434B)
+            self.assertEqual(header_fields[1]["value"], 7)
+
+    def test_script_string_arrays_resolve_zone_local_indices(self):
+        document = {
+            "script_strings": [None, "tag_weapon"],
+            "graph": {"nodes": [{"chunks": [
+                {"data_offset": 0, "data_bytes": 2, "links": []}
+            ]}]},
+        }
+        field = {
+            "name": "boneNames",
+            "link": {"kind": "inline", "target": {"node": 0, "chunk": 0, "offset": 0}},
+        }
+        self.assertEqual(
+            _script_string_array(document, b"\x01\x00", field, 1),
+            [{"index": 1, "string": "tag_weapon"}],
+        )
+        with self.assertRaisesRegex(T5SemanticError, "outside"):
+            _script_string_array(document, b"\x02\x00", field, 1)
+
     def test_recursively_decodes_inline_struct_arrays(self):
         types = [
             {"name": "Pair", "size": 4, "union": False, "members": [

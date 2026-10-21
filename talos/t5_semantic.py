@@ -408,6 +408,33 @@ def _string_table(
     return {"kind": "string_table", "columns": columns, "rows": rows, "cells": cells, "cell_index": indices}
 
 
+def _script_string(document: dict[str, Any], index: int) -> str | None:
+    strings = document["script_strings"]
+    if index < 0 or index >= len(strings):
+        raise T5SemanticError(f"script string index {index} is outside the zone string table")
+    value = strings[index]
+    if value is not None and not isinstance(value, str):
+        raise T5SemanticError(f"script string index {index} is not text or null")
+    return value
+
+
+def _script_string_array(
+    document: dict[str, Any], graph: bytes, field: dict[str, Any], count: int
+) -> list[dict[str, Any]]:
+    data = _linked_bytes(document, graph, field)
+    if data is None:
+        if count:
+            raise T5SemanticError(f"{field['name']} has {count} script strings but no allocation")
+        return []
+    if len(data) < count * 2:
+        raise T5SemanticError(f"{field['name']} script string array is truncated")
+    result = []
+    for position in range(count):
+        index = struct.unpack_from("<H", data, position * 2)[0]
+        result.append({"index": index, "string": _script_string(document, index)})
+    return result
+
+
 def _specialization(
     document: dict[str, Any], graph: bytes, struct_name: str, fields: list[dict[str, Any]]
 ) -> dict[str, Any] | None:
@@ -471,6 +498,47 @@ def _specialization(
             "kind": "streamed_sound",
             "filename": _field(fields, "filename").get("string"),
             "primed_sound_link": _field(fields, "primeSnd").get("link"),
+        }
+    if struct_name == "XModel":
+        count = _field(fields, "numBones").get("value")
+        if not isinstance(count, int) or count < 0:
+            raise T5SemanticError("XModel numBones is invalid")
+        return {
+            "kind": "xmodel",
+            "bone_names": _script_string_array(
+                document, graph, _field(fields, "boneNames"), count
+            ),
+        }
+    if struct_name == "XAnimParts":
+        counts = _field(fields, "boneCount").get("value")
+        notify_count = _field(fields, "notifyCount").get("value")
+        if not isinstance(counts, list) or len(counts) <= 9 or not isinstance(counts[9], int):
+            raise T5SemanticError("XAnimParts boneCount[9] is invalid")
+        if not isinstance(notify_count, int) or notify_count < 0:
+            raise T5SemanticError("XAnimParts notifyCount is invalid")
+        notify_data = _linked_bytes(document, graph, _field(fields, "notify"))
+        notifications = []
+        if notify_data is None:
+            if notify_count:
+                raise T5SemanticError("XAnimParts notifications have no allocation")
+        else:
+            if len(notify_data) < notify_count * 8:
+                raise T5SemanticError("XAnimParts notification array is truncated")
+            for position in range(notify_count):
+                index = struct.unpack_from("<H", notify_data, position * 8)[0]
+                notifications.append(
+                    {
+                        "index": index,
+                        "name": _script_string(document, index),
+                        "time": _finite(struct.unpack_from("<f", notify_data, position * 8 + 4)[0]),
+                    }
+                )
+        return {
+            "kind": "xanim",
+            "bone_names": _script_string_array(
+                document, graph, _field(fields, "names"), counts[9]
+            ),
+            "notifications": notifications,
         }
     return None
 

@@ -59,7 +59,7 @@ py -3 -m talos catalog local\zombie_theater-t5 local\common-t5 `
   --output local\zombie-source-catalog.json
 
 py -3 -m talos payloads local\zombie_theater-t5 `
-  --iwd-root "C:\Games\Black Ops\main" `
+  --iwd-root "C:\Games\Black Ops" `
   --output local\zombie-image-payloads.json
 ```
 
@@ -76,7 +76,9 @@ definitions instead of silently choosing one.
 directories, distinguishes exact matches, identical duplicate sources,
 conflicting sources and non-matches, and can SHA-256 matching IWI payloads with
 `--hash-matches`. Runtime (`*`), generated (`,`) and engine (`$`) name signals
-are reported but never treated as guessed files.
+are reported but never treated as guessed files. `--iwd-root` accepts either the
+BO1 install directory or its direct `main` IWD directory and rejects a scan that
+finds no archives.
 
 Signed/encrypted files, console profiles, and other versions remain outside this
 support boundary.
@@ -112,6 +114,12 @@ runtime/generated/engine prefixes, and no ordinary filename was missing. The
 source SHA-256 was
 `970db88bb5ae9aa1d3875cdbd55d43212f22ee55096ce251f596d4a38a776786`.
 
-That proves the source-decode boundary for that installed file. It does not prove
+The broader retail matrix covers 33 SP, Zombies, MP, UI, patch and localized
+zones: 31,898 roots, 61,910 loaded assets, 1,239,816 nodes, 4,090,024 links, and
+1,312,661,494 allocation bytes. It exercised 31 of T5's 32 unique loadable asset
+structures; the declared but unobserved `PackIndex` path has a synthetic semantic
+fixture. See [the retail validation matrix](docs/T5_RETAIL_VALIDATION.md).
+
+That proves the source-decode boundary for those installed files. It does not prove
 semantic conversion, native T7 serialization, BO3 loader acceptance, or gameplay
 fidelity; those stages remain explicitly unimplemented.

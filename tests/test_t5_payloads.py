@@ -88,6 +88,24 @@ class T5PayloadTests(unittest.TestCase):
             with self.assertRaisesRegex(T5PayloadError, "already exists"):
                 index_image_payloads(bundle, iwds, output)
 
+    def test_accepts_install_root_and_rejects_zero_archive_scan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bundle, main = root / "bundle", root / "bo1" / "main"
+            image_bundle(bundle)
+            main.mkdir(parents=True)
+            write_iwd(main / "iw_00.iwd", "images/example_texture.iwi", b"payload")
+            output = root / "payloads.json"
+            report = index_image_payloads(bundle, root / "bo1", output)
+            document = json.loads(output.read_text())
+            self.assertEqual(report["archives"], 1)
+            self.assertEqual(document["iwd_root"], str(main))
+
+            empty = root / "empty"
+            empty.mkdir()
+            with self.assertRaisesRegex(T5PayloadError, "no IWD archives found"):
+                index_image_payloads(bundle, empty, root / "never-written.json")
+
     def test_reports_conflicting_duplicate_archive_members(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

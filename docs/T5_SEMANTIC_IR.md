@@ -48,3 +48,12 @@ engine prefixes remain explicit non-file signals rather than fabricated paths.
 The same command reads `StreamedSound` filenames from typed graph nodes and
 resolves them against IWD members. `LoadedSound` and `PrimedSound` nodes retain
 their exact in-graph payload extents and SHA-256 identities in semantic IR.
+The IWD argument may be the BO1 install directory or the direct `main`
+directory; a zero-archive scan is rejected rather than producing a misleading
+all-unresolved report.
+
+`XModel.boneNames`, `XAnimParts.names`, and animation notifications are resolved
+from zone-local 16-bit script-string indices to their actual strings while the
+original indices remain present. Catalog fingerprints zero serialized pointer
+values, ignore inline/reference encoding differences, and canonicalize these
+known script-string fields before comparing asset graph closures across zones.

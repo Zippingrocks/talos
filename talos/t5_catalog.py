@@ -26,6 +26,8 @@ def _fingerprint(
     root: int,
     cache: dict[int, str],
     active: set[int] | None = None,
+    script_rules: dict[tuple[int, int], list[tuple[int, int, int]]] | None = None,
+    script_strings: list[str | None] | None = None,
 ) -> str:
     """Merkle-hash a graph closure independent of bundle-local node numbering."""
     if root in cache:
@@ -58,23 +60,80 @@ def _fingerprint(
     for chunk in node["chunks"]:
         start, size = chunk["data_offset"], chunk["data_bytes"]
         digest.update(size.to_bytes(8, "little"))
-        digest.update(graph[start : start + size])
+        canonical_bytes = bytearray(graph[start : start + size])
+        for link in chunk["links"]:
+            offset = link["offset"]
+            canonical_bytes[offset : offset + 4] = bytes(4)
+        canonical_script_strings = []
+        for array_start, stride, count in (script_rules or {}).get((root, chunk["index"]), []):
+            for position in range(count):
+                offset = array_start + position * stride
+                if offset + 2 > len(canonical_bytes):
+                    raise T5CatalogError("script string annotation runs past its graph chunk")
+                index = int.from_bytes(canonical_bytes[offset : offset + 2], "little")
+                if script_strings is None or index >= len(script_strings):
+                    raise T5CatalogError("script string annotation has an invalid index")
+                canonical_script_strings.append(script_strings[index])
+                canonical_bytes[offset : offset + 2] = bytes(2)
+        digest.update(canonical_bytes)
+        digest.update(
+            json.dumps(canonical_script_strings, ensure_ascii=False, separators=(",", ":")).encode()
+        )
         for link in chunk["links"]:
             target = link.get("target")
-            normalized = {"offset": link["offset"], "kind": link["kind"], "target": None}
+            normalized = {"offset": link["offset"], "target": None}
             if target is not None:
                 normalized["target"] = {
                     "fingerprint": _fingerprint(
-                        document, graph, target["node"], cache, active
+                        document, graph, target["node"], cache, active,
+                        script_rules, script_strings,
                     ),
                     "chunk": target["chunk"],
                     "offset": target["offset"],
                 }
+            else:
+                # A null/runtime allocation retains loader semantics because it
+                # has no target content with which to identify it.
+                normalized["null_kind"] = link["kind"]
             digest.update(json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode())
     active.remove(root)
     result = digest.hexdigest()
     cache[root] = result
     return result
+
+
+def _script_string_rules(
+    document: dict[str, Any], graph: bytes, layout: dict[str, Any]
+) -> dict[tuple[int, int], list[tuple[int, int, int]]]:
+    """Locate the T5 script-string arrays Hermes already proves and remaps."""
+    types = layout["types"]
+    rules: dict[tuple[int, int], set[tuple[int, int, int]]] = defaultdict(set)
+    for asset in document["loaded_assets"]:
+        if asset["type_name"] not in {"XModel", "XAnimParts"}:
+            continue
+        node = document["graph"]["nodes"][asset["root_node"]]
+        chunk = node["chunks"][0]
+        raw = graph[chunk["data_offset"] : chunk["data_offset"] + chunk["data_bytes"]]
+        layout_type = types[node["type_index"]]
+        members = {member["name"]: member for member in layout_type["members"]}
+        links = {link["offset"]: link for link in chunk["links"]}
+        if asset["type_name"] == "XModel":
+            descriptions = [("boneNames", raw[members["numBones"]["offset"]], 2)]
+        else:
+            descriptions = [
+                ("names", raw[members["boneCount"]["offset"] + 9], 2),
+                ("notify", raw[members["notifyCount"]["offset"]], 8),
+            ]
+        for member_name, count, stride in descriptions:
+            link = links.get(members[member_name]["offset"])
+            target = link.get("target") if link is not None else None
+            if count and target is None:
+                raise T5CatalogError(f"{asset['type_name']}.{member_name} has no graph target")
+            if target is not None:
+                rules[(target["node"], target["chunk"])].add(
+                    (target["offset"], stride, count)
+                )
+    return {key: sorted(values) for key, values in rules.items()}
 
 
 def build_catalog(bundles: list[Path], output: Path) -> dict[str, Any]:
@@ -92,6 +151,8 @@ def build_catalog(bundles: list[Path], output: Path) -> dict[str, Any]:
         bundle = Path(bundle_value)
         document, inventory = validate_bundle(bundle)
         graph = (bundle / GRAPH_DATA).read_bytes()
+        layout = json.loads((bundle / "t5-layout.json").read_text(encoding="utf-8-sig"))
+        script_rules = _script_string_rules(document, graph, layout)
         source = {
             "index": source_index,
             "bundle": str(bundle),
@@ -109,7 +170,11 @@ def build_catalog(bundles: list[Path], output: Path) -> dict[str, Any]:
                     f"{document['source_file']} loaded asset {asset['index']} has no graph root"
                 )
             if root not in fingerprints:
-                fingerprints[root] = _fingerprint(document, graph, root, fingerprints)
+                fingerprints[root] = _fingerprint(
+                    document, graph, root, fingerprints,
+                    script_rules=script_rules,
+                    script_strings=document["script_strings"],
+                )
             fingerprint = fingerprints[root]
             root_chunks = document["graph"]["nodes"][root]["chunks"]
             occurrence = {
